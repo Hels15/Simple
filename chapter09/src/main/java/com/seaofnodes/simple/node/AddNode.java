@@ -5,15 +5,25 @@ import com.seaofnodes.simple.type.*;
 import java.util.BitSet;
 
 public class AddNode extends Node {
-    public AddNode(Node lhs, Node rhs) { super(null, lhs, rhs); }
+    public AddNode(Node lhs, Node rhs) {
+        super(null, lhs, rhs);
+    }
 
-    @Override public String label() { return "Add"; }
+    @Override
+    public String label() {
+        return "Add";
+    }
 
-    @Override public String glabel() { return "+"; }
+    @Override
+    public String glabel() {
+        return "+";
+    }
 
     @Override
     StringBuilder _print1(StringBuilder sb, BitSet visited) {
         in(1)._print0(sb.append("("), visited);
+        System.out.print("Id of (arg*2) + 1: ");
+        System.out.print(in(1)._nid);
         in(2)._print0(sb.append("+"), visited);
         return sb.append(")");
     }
@@ -21,57 +31,66 @@ public class AddNode extends Node {
 
     @Override
     public Type compute() {
-        if( in(1)._type instanceof TypeInteger i0 &&
-            in(2)._type instanceof TypeInteger i1 ) {
+        if (in(1)._type instanceof TypeInteger i0 &&
+                in(2)._type instanceof TypeInteger i1) {
             if (i0.isConstant() && i1.isConstant())
-                return TypeInteger.constant(i0.value()+i1.value());
+                return TypeInteger.constant(i0.value() + i1.value());
         }
         return in(1)._type.meet(in(2)._type);
     }
 
     @Override
-    public Node idealize () {
+    public Node idealize() {
         Node lhs = in(1);
         Node rhs = in(2);
         Type t2 = rhs._type;
 
         // Add of 0.  We do not check for (0+x) because this will already
         // canonicalize to (x+0)
-        if( t2 instanceof TypeInteger i && i.value()==0 )
+        if (t2 instanceof TypeInteger i && i.value() == 0)
             return lhs;
 
-        // Add of same to a multiply by 2
-        if( lhs==rhs )
-            return new MulNode(lhs,new ConstantNode(TypeInteger.constant(2)).peephole());
+        // arg + arg -> arg*2 | arg + arg + arg -> arg*3 |
+        // Add of same to a multiply by 2, 3, 4 etc
+        if (lhs == rhs)
+            return new MulNode(lhs, new ConstantNode(TypeInteger.constant(2)).peephole());
 
+        while ((lhs instanceof MulNode) && (rhs == lhs.in(1)) && (lhs.in(2) instanceof ConstantNode)) {
+            ConstantNode old_mltipcand = (ConstantNode) lhs.in(2);
+            TypeInteger new_type = TypeInteger.make(true, ((TypeInteger)old_mltipcand._con)._con + 1);
+            ConstantNode new_mltipcand = new ConstantNode(new_type);
+            new_mltipcand._type = new_type;
+            Node mul1 =  new MulNode(lhs.in(1), new_mltipcand).peephole();
+            return mul1;
+        }
         // Goal: a left-spine set of adds, with constants on the rhs (which then fold).
 
         // Move non-adds to RHS
-        if( !(lhs instanceof AddNode) && rhs instanceof AddNode )
+        if (!(lhs instanceof AddNode) && rhs instanceof AddNode)
             return swap12();
 
         // x+(-y) becomes x-y
-        if( rhs instanceof MinusNode minus )
-            return new SubNode(lhs,minus.in(1));
+        if (rhs instanceof MinusNode minus)
+            return new SubNode(lhs, minus.in(1));
 
         // Now we might see (add add non) or (add non non) or (add add add) but never (add non add)
 
         // Do we have  x + (y + z) ?
         // Swap to    (x + y) + z
         // Rotate (add add add) to remove the add on RHS
-        if( rhs instanceof AddNode add )
-            return new AddNode(new AddNode(lhs,add.in(1)).peephole(), add.in(2));
+        if (rhs instanceof AddNode add)
+            return new AddNode(new AddNode(lhs, add.in(1)).peephole(), add.in(2));
 
         // Now we might see (add add non) or (add non non) but never (add non add) nor (add add add)
-        if( !(lhs instanceof AddNode) )
+        if (!(lhs instanceof AddNode))
             // Rotate; look for (add (phi cons) con/(phi cons))
-            return spine_cmp(lhs,rhs,this) ? swap12() : phiCon(this,true);
+            return spine_cmp(lhs, rhs, this) ? swap12() : phiCon(this, true);
 
         // Now we only see (add add non)
 
         // Dead data cycle; comes about from dead infinite loops.  Do nothing,
         // the loop will peep as dead after a bit.
-        if( lhs.in(1) == lhs )
+        if (lhs.in(1) == lhs)
             return null;
 
         // Do we have (x + con1) + con2?
@@ -80,22 +99,22 @@ public class AddNode extends Node {
         // If lhs.in(2) is not a constant, we add ourselves as a dependency
         // because if it later became a constant then we could make this
         // transformation.
-        if( lhs.in(2).addDep(this)._type.isConstant() && rhs._type.isConstant() )
-            return new AddNode(lhs.in(1),new AddNode(lhs.in(2),rhs).peephole());
+        if (lhs.in(2).addDep(this)._type.isConstant() && rhs._type.isConstant())
+            return new AddNode(lhs.in(1), new AddNode(lhs.in(2), rhs).peephole());
 
 
         // Do we have ((x + (phi cons)) + con) ?
         // Do we have ((x + (phi cons)) + (phi cons)) ?
         // Push constant up through the phi: x + (phi con0+con0 con1+con1...)
-        Node phicon = phiCon(this,true);
-        if( phicon!=null ) return phicon;
+        Node phicon = phiCon(this, true);
+        if (phicon != null) return phicon;
 
         // Now we sort along the spine via rotates, to gather similar things together.
 
         // Do we rotate (x + y) + z
         // into         (x + z) + y ?
-        if( spine_cmp(lhs.in(2),rhs,this) )
-            return new AddNode(new AddNode(lhs.in(1),rhs).peephole(),lhs.in(2));
+        if (spine_cmp(lhs.in(2), rhs, this))
+            return new AddNode(new AddNode(lhs.in(1), rhs).peephole(), lhs.in(2));
 
         return null;
     }
@@ -107,20 +126,20 @@ public class AddNode extends Node {
         Node lhs = op.in(1);
         Node rhs = op.in(2);
         // LHS is either a Phi of constants, or another op with Phi of constants
-        PhiNode lphi = pcon(lhs,op);
-        if( rotate && lphi==null && lhs.nIns() > 2 ) {
+        PhiNode lphi = pcon(lhs, op);
+        if (rotate && lphi == null && lhs.nIns() > 2) {
             // Only valid to rotate constants if both are same associative ops
-            if( lhs.getClass() != op.getClass() ) return null;
-            lphi = pcon(lhs.in(2),op); // Will rotate with the Phi push
+            if (lhs.getClass() != op.getClass()) return null;
+            lphi = pcon(lhs.in(2), op); // Will rotate with the Phi push
         }
-        if( lphi==null ) return null;
+        if (lphi == null) return null;
 
         // RHS is a constant or a Phi of constants
-        if( !(rhs instanceof ConstantNode) && pcon(rhs,op)==null )
+        if (!(rhs instanceof ConstantNode) && pcon(rhs, op) == null)
             return null;
 
         // If both are Phis, must be same Region
-        if( rhs instanceof PhiNode && lphi.in(0) != rhs.in(0) )
+        if (rhs instanceof PhiNode && lphi.in(0) != rhs.in(0))
             return null;
 
         // Note that this is the exact reverse of Phi pulling a common op down
@@ -129,12 +148,12 @@ public class AddNode extends Node {
         Node[] ns = new Node[lphi.nIns()];
         ns[0] = lphi.in(0);
         // Push constant up through the phi: x + (phi con0+con0 con1+con1...)
-        for( int i=1; i<ns.length; i++ )
+        for (int i = 1; i < ns.length; i++)
             ns[i] = op.copy(lphi.in(i), rhs instanceof PhiNode ? rhs.in(i) : rhs).peephole();
         String label = lphi._label + (rhs instanceof PhiNode rphi ? rphi._label : "");
-        Node phi = new PhiNode(label,ns).peephole();
+        Node phi = new PhiNode(label, ns).peephole();
         // Rotate needs another op, otherwise just the phi
-        return lhs==lphi ? phi : op.copy(lhs.in(1),phi);
+        return lhs == lphi ? phi : op.copy(lhs.in(1), phi);
     }
 
     /**
@@ -153,22 +172,25 @@ public class AddNode extends Node {
     // Generally constants always go right, then Phi-of-constants, then muls, then others.
     // Ties with in a category sort by node ID.
     // TRUE if swapping hi and lo.
-    static boolean spine_cmp( Node hi, Node lo, Node dep ) {
-        if( lo._type.isConstant() ) return false;
-        if( hi._type.isConstant() ) return true ;
+    static boolean spine_cmp(Node hi, Node lo, Node dep) {
+        if (lo._type.isConstant()) return false;
+        if (hi._type.isConstant()) return true;
 
-        if( lo instanceof PhiNode lphi && lphi.region()._type==Type.XCONTROL ) return false;
-        if( hi instanceof PhiNode hphi && hphi.region()._type==Type.XCONTROL ) return false;
+        if (lo instanceof PhiNode lphi && lphi.region()._type == Type.XCONTROL) return false;
+        if (hi instanceof PhiNode hphi && hphi.region()._type == Type.XCONTROL) return false;
 
-        if( lo instanceof PhiNode && lo.allCons(dep) ) return false;
-        if( hi instanceof PhiNode && hi.allCons(dep) ) return true ;
+        if (lo instanceof PhiNode && lo.allCons(dep)) return false;
+        if (hi instanceof PhiNode && hi.allCons(dep)) return true;
 
-        if( lo instanceof PhiNode && !(hi instanceof PhiNode) ) return true;
-        if( hi instanceof PhiNode && !(lo instanceof PhiNode) ) return false;
+        if (lo instanceof PhiNode && !(hi instanceof PhiNode)) return true;
+        if (hi instanceof PhiNode && !(lo instanceof PhiNode)) return false;
 
         // Same category of "others"
         return lo._nid > hi._nid;
     }
 
-    @Override Node copy(Node lhs, Node rhs) { return new AddNode(lhs,rhs); }
+    @Override
+    Node copy(Node lhs, Node rhs) {
+        return new AddNode(lhs, rhs);
+    }
 }
