@@ -52,15 +52,14 @@ public class AddNode extends Node {
 
         // arg + arg -> arg*2 | arg + arg + arg -> arg*3 |
         // Add of same to a multiply by 2, 3, 4 etc
-        if (lhs == rhs)
-            return new MulNode(lhs, new ConstantNode(TypeInteger.constant(2)).peephole());
+        if( lhs==rhs )
+            return new MulNode(lhs,new ConstantNode(TypeInteger.constant(2)).peephole());
 
-        while ((lhs instanceof MulNode) && (rhs == lhs.in(1)) && (lhs.in(2) instanceof ConstantNode)) {
+        if ((lhs instanceof MulNode) && (rhs == lhs.in(1)) && (lhs.in(2) instanceof ConstantNode)) {
             ConstantNode old_mltipcand = (ConstantNode) lhs.in(2);
             TypeInteger new_type = TypeInteger.make(true, ((TypeInteger)old_mltipcand._con)._con + 1);
-            ConstantNode new_mltipcand = new ConstantNode(new_type);
-            new_mltipcand._type = new_type;
-            Node mul1 =  new MulNode(lhs.in(1), new_mltipcand).peephole();
+            Node new_mltipcand = new ConstantNode(new_type).peephole();
+            Node mul1 =  new MulNode(lhs.in(1), new_mltipcand);
             return mul1;
         }
         // Goal: a left-spine set of adds, with constants on the rhs (which then fold).

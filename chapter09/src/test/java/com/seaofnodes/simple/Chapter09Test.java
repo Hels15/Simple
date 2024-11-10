@@ -42,8 +42,26 @@ return x;
                 """);
         StopNode stop = parser.parse(true);
         assertEquals("Stop[ return (arg*3); return (Mul+1); ]", stop.toString());
-        Assert.assertEquals(2, GraphEvaluator.evaluate(stop, 1));
-        Assert.assertEquals(23, GraphEvaluator.evaluate(stop, 11));
+        Assert.assertEquals(3, GraphEvaluator.evaluate(stop, 1));
+        Assert.assertEquals(34, GraphEvaluator.evaluate(stop, 11));
+    }
+    @Test
+    public void testPeephole2() {
+        Parser parser = new Parser(
+                """
+int x = arg + arg + arg + arg + arg + arg;
+if(arg < 10) {
+    return x;
+}
+else {
+    x = x + 1;
+}
+return x;
+                """);
+        StopNode stop = parser.parse(true);
+        assertEquals("Stop[ return (arg*6); return (Mul+1); ]", stop.toString());
+        Assert.assertEquals(6, GraphEvaluator.evaluate(stop, 1));
+        Assert.assertEquals(67, GraphEvaluator.evaluate(stop, 11));
     }
 
     @Test
