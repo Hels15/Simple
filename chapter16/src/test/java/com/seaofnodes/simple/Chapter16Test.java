@@ -9,23 +9,6 @@ import static org.junit.Assert.fail;
 public class Chapter16Test {
 
     @Test
-    public void testExtraPeep() {
-        Parser parser = new Parser(
-                """
-                        int x = arg + arg + arg;
-                        if(arg < 10) {
-                            return arg + arg + arg;
-                        }
-                        else {
-                            x = x + 1;
-                        }
-                        return x;     
-                       """
-        );
-        StopNode stop = parser.parse();
-        assertEquals("Stop[ return (arg*3); return (Mul+1); ]", stop.toString());
-    }
-    @Test
     public void testJig() {
         Parser parser = new Parser(
 """

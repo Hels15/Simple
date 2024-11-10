@@ -22,8 +22,6 @@ public class AddNode extends Node {
     @Override
     StringBuilder _print1(StringBuilder sb, BitSet visited) {
         in(1)._print0(sb.append("("), visited);
-        System.out.print("Id of (arg*2) + 1: ");
-        System.out.print(in(1)._nid);
         in(2)._print0(sb.append("+"), visited);
         return sb.append(")");
     }
