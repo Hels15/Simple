@@ -3,6 +3,9 @@ package com.seaofnodes.simple.node.cpus.riscv;
 import com.seaofnodes.simple.Utils;
 import com.seaofnodes.simple.codegen.*;
 import com.seaofnodes.simple.node.*;
+import com.seaofnodes.simple.node.cpus.x86_64_v2.CondAndX86;
+import com.seaofnodes.simple.node.cpus.x86_64_v2.CondOrX86;
+import com.seaofnodes.simple.node.cpus.x86_64_v2.IntX86;
 import com.seaofnodes.simple.type.*;
 
 public class riscv extends Machine {
@@ -328,6 +331,8 @@ public class riscv extends Machine {
         case AndNode      and -> and(and);
         case BoolNode    bool -> cmp(bool);
         case CallNode    call -> call(call);
+        case CondAndNode and  -> cond_and(and);
+        case CondOrNode  or   -> cond_or(or);
         case CastNode   cast  -> new CastMach(cast);
         case CallEndNode cend -> new CallEndMach(cend);
         case CProjNode      c -> new CProjNode(c);
@@ -364,6 +369,16 @@ public class riscv extends Machine {
         case RegionNode region -> new RegionNode(region);
         default -> throw Utils.TODO();
         };
+    }
+
+    private Node cond_and(CondAndNode and) {
+        if(and._type.isConstant()) return new IntRISC(new ConstantNode(and._type));
+        else return new CondAndRISC(and);
+    }
+
+    private Node cond_or(CondOrNode or) {
+        if(or._type.isConstant()) return new IntRISC(new ConstantNode(or._type));
+        else return new CondOrRISC(or);
     }
 
     private Node addf(AddFNode addf) {

@@ -346,6 +346,8 @@ public class x86_64_v2 extends Machine {
         case CProjNode      c -> new CProjNode(c);
         case CallEndNode cend -> new CallEndMach(cend);
         case CallNode    call -> call(call);
+        case CondAndNode and  -> cond_and(and);
+        case CondOrNode  or   -> cond_or(or);
         case CastNode    cast -> new CastMach(cast);
         case ConstantNode con -> con(con);
         case DivFNode    divf -> new DivFX86(divf);
@@ -420,6 +422,7 @@ public class x86_64_v2 extends Machine {
     }
 
 
+
     private Node addf(AddFNode addf) {
         if(addf.in(1) instanceof LoadNode ld && ld.nOuts() == 1)
             return new AddFMemX86(addf, address(ld), ld.ptr(), idx, off, scale, addf.in(2));
@@ -446,6 +449,15 @@ public class x86_64_v2 extends Machine {
             : new LeaX86(add, base, idx, scale, off);
     }
 
+    private Node cond_and(CondAndNode and) {
+       if(and._type.isConstant()) return new IntX86(new ConstantNode(and._type));
+       else return new CondAndX86(and);
+    }
+
+    private Node cond_or(CondOrNode or) {
+        if(or._type.isConstant()) return new IntX86(new ConstantNode(or._type));
+        else return new CondOrX86(or);
+    }
 
     private Node and(AndNode and) {
         if( and.in(2) instanceof ConstantNode con && con._con instanceof TypeInteger ti && imm32(ti.value()) )

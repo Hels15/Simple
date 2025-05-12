@@ -945,10 +945,30 @@ public class Parser {
      * @return an expression {@link Node}, never {@code null}
      */
     private Node parseExpression() {
-        Node expr = parseBitwise();
+        Node expr = parseCondOps();
         return match("?") ? parseTrinary(expr,false,":") : expr;
     }
 
+    /**
+     * Parse an bitwise expression
+     *
+     * <pre>
+     *     bitwise : compareExpr (('&&' | '||') compareExpr)*
+     * </pre>
+     * @return a bitwise expression {@link Node}, never {@code null}
+     */
+    private Node parseCondOps() {
+        Node lhs = parseBitwise();
+        while( true ) {
+            if( false ) ;
+            else if( match("&&")) lhs = new CondAndNode(lhs,null);
+            else if( match("||")) lhs = new CondOrNode(lhs,null);
+            else break;
+            lhs.setDef(2,parseBitwise());
+            lhs = peep(lhs);
+        }
+        return lhs;
+    }
     /**
      * Parse an bitwise expression
      *
@@ -959,10 +979,11 @@ public class Parser {
      */
     private Node parseBitwise() {
         Node lhs = parseComparison();
+
         while( true ) {
             if( false ) ;
-            else if( match("&") ) lhs = new AndNode(loc(),lhs,null);
-            else if( match("|") ) lhs = new  OrNode(loc(),lhs,null);
+            else if( match("&") && !peek('&')) lhs = new AndNode(loc(),lhs,null);
+            else if( match("|")  && !peek('|')) lhs = new  OrNode(loc(),lhs,null);
             else if( match("^") ) lhs = new XorNode(loc(),lhs,null);
             else break;
             lhs.setDef(2,parseComparison());

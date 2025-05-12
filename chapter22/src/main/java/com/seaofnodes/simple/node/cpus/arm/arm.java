@@ -3,6 +3,7 @@ package com.seaofnodes.simple.node.cpus.arm;
 import com.seaofnodes.simple.Utils;
 import com.seaofnodes.simple.codegen.*;
 import com.seaofnodes.simple.node.*;
+import com.seaofnodes.simple.node.cpus.x86_64_v2.IntX86;
 import com.seaofnodes.simple.type.*;
 
 public class arm extends Machine {
@@ -651,6 +652,8 @@ public class arm extends Machine {
         case AndNode and     -> and(and);
         case BoolNode bool   -> cmp(bool);
         case CallNode call   -> call(call);
+        case CondAndNode and -> cond_and(and);
+        case CondOrNode and  -> cond_or(and);
         case CastNode cast   -> new CastMach(cast);
         case CallEndNode cend-> new CallEndMach(cend);
         case CProjNode c     -> new CProjNode(c);
@@ -687,6 +690,16 @@ public class arm extends Machine {
         case RegionNode region-> new RegionNode(region);
         default -> throw Utils.TODO();
         };
+    }
+
+    private Node cond_and(CondAndNode and) {
+        if(and._type.isConstant()) return new IntARM(new ConstantNode(and._type));
+        return new CondAndARM(and);
+    }
+
+    private Node cond_or(CondOrNode or) {
+        if(or._type.isConstant()) return new IntARM(new ConstantNode(or._type));
+        return new CondOrARM(or);
     }
 
     private Node cmp(BoolNode bool){
