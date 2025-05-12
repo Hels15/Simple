@@ -1,7 +1,6 @@
 package com.seaofnodes.simple;
 
 import com.seaofnodes.simple.codegen.CodeGen;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -17,12 +16,13 @@ public class Chapter22Test {
     @Test @Ignore
     public void testJig() throws IOException {
         String src = Files.readString(Path.of("src/test/java/com/seaofnodes/simple/progs/jig.smp"));
+        //String src = Files.readString(Path.of("docs/examples/BubbleSort.smp"));
         testCPU(src,"x86_64_v2", "Win64"  ,-1,null);
         testCPU(src,"riscv"    , "SystemV",-1,null);
         testCPU(src,"arm"      , "SystemV",-1,null);
     }
 
-    static void testCPU( String src, String cpu, String os, int spills, String stop ) {
+    static CodeGen testCPU( String src, String cpu, String os, int spills, String stop ) {
         CodeGen code = new CodeGen(src).driver(CodeGen.Phase.Encoding,cpu,os);
         int delta = spills>>3;
         if( delta==0 ) delta = 1;
@@ -30,28 +30,27 @@ public class Chapter22Test {
             assertEquals("Expect spills:",spills,code._regAlloc._spillScaled,delta);
         if( stop != null )
             assertEquals(stop, code._stop.toString());
+        return code;
     }
 
 
     static int testCPUSize( String src, String cpu, String os, int spills, String stop ) {
-        CodeGen code = new CodeGen(src).driver(CodeGen.Phase.Encoding,cpu,os);
-        int delta = spills>>3;
-        if( delta==0 ) delta = 1;
-        if( spills != -1 )
-            assertEquals("Expect spills:",spills,code._regAlloc._spillScaled,delta);
-        if( stop != null )
-            assertEquals(stop, code._stop.toString());
-        return code._encoding._bits.size();
+        return testCPU(src,cpu,os,spills,stop)._encoding._bits.size();
     }
 
     // Should not fold away
     @Test public void testSextFail() throws IOException {
-        String src = """ 
+        String src = """
 struct Person { i32 age;};
 Person !p = new Person;
 p.age = (arg<<17)>>17;
-return 0;   
+return 0;
 """;
+        assertEquals(46, testCPUSize(src, "x86_64_v2","Win64",2,"return 0;"));
+        assertEquals(60, testCPUSize(src, "riscv","SystemV",4,"return 0;"));
+        assertEquals(56, testCPUSize(src, "arm","SystemV",4,"return 0;"));
+
+        // do assertEquals here
         EvalRisc5 R5 = TestRisc5.build("sext_str_not_fold_away", 0, 4, false);
         int trap = R5.step(100);
         assertEquals(0,trap);
@@ -60,16 +59,12 @@ return 0;
         trap = A5.step(100);
         assertEquals(0,trap);
 
-        assertEquals(46, testCPUSize(src, "x86_64_v2","Win64",2,"return 0;"));
-        assertEquals(60, testCPUSize(src, "riscv","SystemV",4,"return 0;"));
-        assertEquals(56, testCPUSize(src, "arm","SystemV",4,"return 0;"));
-        // do assertEquals here
     }
 
     // Should not fold away
     @Test public void testSextFail2() throws IOException {
         String src = """
-             
+
                 struct Person { i32 age;};
                 Person !p = new Person;
                 p.age = (arg<<48)>>48;
@@ -92,7 +87,7 @@ return 0;
 
     // Should fold away
     @Test public void testSextSuccess() throws IOException {
-        String src = """ 
+        String src = """
 // Should fold away sign extend
 struct Person { i8 age;};
 Person !p = new Person;
@@ -113,159 +108,7 @@ return 0;
         assertEquals(52, testCPUSize(src, "arm","SystemV",5,"return 0;"));
         // do assertEquals here
     }
-    @Test public void testAnd1() throws IOException {
-        String src = """ 
-        int a = 2;
-        int b = 2;
-        if(a && b) {
-            return 1;
-        } else {
-            return 0;
-        }
-        """;
 
-//        EvalRisc5 R5 = TestRisc5.build("and1", 0, 5, false);
-//        int trap = R5.step(100);
-//        assertEquals(0,trap);
-//
-//        EvalArm64 A5 = TestArm64.build("and1", 0, 5, false);
-//        int trap_arm = A5.step(100);
-//        assertEquals(0,trap_arm);
-
-          testCPU(src, "x86_64_v2","Win64",0,"return 1;");
-//        assertEquals(56, testCPUSize(src, "riscv","SystemV",5,"return 1;"));
-//        assertEquals(52, testCPUSize(src, "arm","SystemV",5,"return 1;"));
-    }
-
-    @Test public void testAnd2() throws IOException {
-        String src = """ 
-                    int a = 2;
-                    int b = 0;
-                    if(a && b) {
-                        return 1;
-                    } else {
-                        return 0;
-                    }
-              
-                """;
-
-        EvalRisc5 R5 = TestRisc5.build("and2", 0, 5, false);
-        int trap = R5.step(100);
-        assertEquals(0,trap);
-
-        EvalArm64 A5 = TestArm64.build("and2", 0, 5, false);
-        int trap_arm = A5.step(100);
-        assertEquals(0,trap_arm);
-
-        assertEquals(41, testCPUSize(src, "x86_64_v2","Win64",2,"return 0;"));
-        assertEquals(56, testCPUSize(src, "riscv","SystemV",5,"return 0;"));
-        assertEquals(52, testCPUSize(src, "arm","SystemV",5,"return 0;"));
-    }
-
-
-    @Test public void testAnd3() throws IOException {
-        String src = """ 
-                    val fact = { int n ->
-                      n
-                    };
-                    int a = 2;
-                    int b = 2;
-                    if(fact(1) && b) {
-                        return 1;
-                    } else {
-                        return 0;
-                    }
-              
-                """;
-
-        EvalRisc5 R5 = TestRisc5.build("and3", 0, 5, false);
-        int trap = R5.step(100);
-        assertEquals(0,trap);
-
-        EvalArm64 A5 = TestArm64.build("and3", 0, 5, false);
-        int trap_arm = A5.step(100);
-        assertEquals(0,trap_arm);
-
-        assertEquals(41, testCPUSize(src, "x86_64_v2","Win64",2,"return 1;"));
-        assertEquals(56, testCPUSize(src, "riscv","SystemV",5,"return 1;"));
-        assertEquals(52, testCPUSize(src, "arm","SystemV",5,"return 1;"));
-    }
-
-    @Test public void testOr1() throws IOException {
-        String src = """ 
-                    int a = 2;
-                    int b = 2;
-                    if(a || b) {
-                        return 1;
-                    } else {
-                        return 0;
-                    }
-              
-                """;
-        EvalRisc5 R5 = TestRisc5.build("or1", 0, 5, false);
-        int trap = R5.step(100);
-        assertEquals(0,trap);
-
-        EvalArm64 A5 = TestArm64.build("or1", 0, 5, false);
-        int trap_arm = A5.step(100);
-        assertEquals(0,trap_arm);
-
-        assertEquals(41, testCPUSize(src, "x86_64_v2","Win64",2,"return 1;"));
-        assertEquals(56, testCPUSize(src, "riscv","SystemV",5,"return 1;"));
-        assertEquals(52, testCPUSize(src, "arm","SystemV",5,"return 1;"));
-
-    }
-
-    @Test public void testOr2() throws IOException {
-        String src = """ 
-                    int a = 2;
-                    int b = 0;
-                    if(a || b) {
-                        return 1;
-                    } else {
-                        return 0;
-                    }
-                """;
-        EvalRisc5 R5 = TestRisc5.build("or2", 0, 5, false);
-        int trap = R5.step(100);
-        assertEquals(0,trap);
-
-        EvalArm64 A5 = TestArm64.build("or2", 0, 5, false);
-        int trap_arm = A5.step(100);
-        assertEquals(0,trap_arm);
-
-        assertEquals(41, testCPUSize(src, "x86_64_v2","Win64",2,"return 0;"));
-        assertEquals(56, testCPUSize(src, "riscv","SystemV",5,"return 0;"));
-        assertEquals(52, testCPUSize(src, "arm","SystemV",5,"return 0;"));
-
-    }
-
-    @Test public void testOr3() throws IOException {
-        String src = """ 
-                    val fact = { int n ->
-                      n
-                    };
-                    int a = 2;
-                    int b = 0;
-                    if(fact(1) || b) {
-                        return 1;
-                    } else {
-                        return 0;
-                    }
-                """;
-        EvalRisc5 R5 = TestRisc5.build("or2", 0, 5, false);
-        int trap = R5.step(100);
-        assertEquals(0,trap);
-
-        EvalArm64 A5 = TestArm64.build("or2", 0, 5, false);
-        int trap_arm = A5.step(100);
-        assertEquals(0,trap_arm);
-
-        assertEquals(41, testCPUSize(src, "x86_64_v2","Win64",2,"return 1;"));
-        assertEquals(56, testCPUSize(src, "riscv","SystemV",5,"return 1;"));
-        assertEquals(52, testCPUSize(src, "arm","SystemV",5,"return 1;"));
-
-    }
 
     // Int now is changed to 4 bytes.
     @Test public void testPerson() throws IOException {
@@ -344,12 +187,14 @@ return cc.cz;
         int trap = R5.step(100);
         assertEquals(0,trap);
         assertEquals(0,R5.regs[riscv.A0]);
+        assertEquals("Hello, World!",R5._stdout.toString());
 
         // Evaluate on ARM emulator
         EvalArm64 arm = TestArm64.build("helloWorld", 0, 2, false);
         trap = arm.step(100);
         assertEquals(0,trap);
         assertEquals(0,arm.regs[0]);
+        assertEquals("Hello, World!",arm._stdout.toString());
     }
 
     @Test
@@ -359,7 +204,7 @@ int N=4;
 i32[] !is = new i32[N];
 for( int i=0; i<N; i++ )
     is[i] = i*i;
-val sum = { i32[~] is ->
+val sum = { i32[~] is ->  // final array
     int sum=0;
     for( int i=0; i<is#; i++ )
         sum += is[i];

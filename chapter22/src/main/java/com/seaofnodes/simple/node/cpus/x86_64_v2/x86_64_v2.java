@@ -43,6 +43,8 @@ public class x86_64_v2 extends Machine {
     static RegMask XMASK = new RegMask(FP_BITS);
     static RegMask FLAGS_MASK = new RegMask(FLAGS);
     static RegMask RPC_MASK = new RegMask(RPC);
+    // Divide mask: exclude RDX:RAX
+    static RegMask DIV_MASK = new RegMask(RD_BITS & ~(1L<<RAX) & ~(1L<<RDX));
 
     static final long SPILLS = -(1L << MAX_REG);
     static final RegMask SPLIT_MASK = new RegMask(WR_BITS | FP_BITS /* | (1L<<FLAGS)*/ | SPILLS, -1L );
@@ -61,7 +63,7 @@ public class x86_64_v2 extends Machine {
     public static RegMask XMM0_MASK = new RegMask(XMM0);
 
     // Encoding
-    public static int REX = 0x40;
+    public static int REX    = 0x40;
     public static int REX_W  = 0x48;
     public static int REX_WR = 0x4C;
     public static int REX_WRB= 0x4D;

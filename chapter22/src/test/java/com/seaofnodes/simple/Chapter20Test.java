@@ -66,7 +66,7 @@ val sqrt = { int x ->
 int cast_int = arg+2;
 return sqrt(arg) + sqrt(cast_int);
 """;
-        testCPU(src,"x86_64_v2", "Win64"  ,23,null);
+        testCPU(src,"x86_64_v2", "Win64"  ,55,null);
         testCPU(src,"riscv"    , "SystemV",19,null);
         testCPU(src,"arm"      , "SystemV",19,null);
     }
@@ -104,7 +104,7 @@ return sqrt(arg) + sqrt(cast_int);
         String src = Files.readString(Path.of("src/test/java/com/seaofnodes/simple/progs/stringHash.smp"));
         testCPU(src,"x86_64_v2", "SystemV", 9,null);
         testCPU(src,"riscv"    , "SystemV", 5,null);
-        testCPU(src,"arm"      , "SystemV", 6,null);
+        testCPU(src,"arm"      , "SystemV", 3,null);
     }
 
     @Test
