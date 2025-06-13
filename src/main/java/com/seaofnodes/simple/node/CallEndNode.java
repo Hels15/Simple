@@ -48,7 +48,12 @@ public class CallEndNode extends CFGNode implements MultiNode {
             // across the linked returns and join with the function return type.
             if( tfp.isConstant() && nIns()>1 ) {
                 assert nIns()==2;     // Linked exactly once for a constant
-                ret = ((TypeTuple)in(1)._type).ret(); // Return type
+                if(in(1)._type instanceof TypeTuple) {
+                    assert in(1)._type instanceof TypeTuple;
+                    ret = ((TypeTuple) in(1)._type).ret(); // Return type
+                } else {
+                    ret = in(1)._type;
+                }
             }
         }
         return TypeTuple.make(call._type,TypeMem.BOT,ret);
@@ -76,8 +81,9 @@ public class CallEndNode extends CFGNode implements MultiNode {
                     CFGNode idom = call;
                     while( !(idom instanceof FunNode) && idom!=null )
                         idom = idom.idom();
+                    if( idom!=null ) addDep(idom);
                     // Inline?
-                    if( idom != fun && idom != null ) {
+                    if( idom != fun && idom != null && !((FunNode)idom)._folding ) {
                         // Trivial inline: rewrite
                         _folding = true;
                         // Rewrite Fun so the normal RegionNode ideal collapses

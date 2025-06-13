@@ -14,6 +14,8 @@ public class PhiNode extends Node {
     // Int stays Int, Ptr stays Ptr, Control stays Control, Mem stays Mem.
     Type _minType;
 
+    int lattice_drop;
+
     public PhiNode(String label, Type minType, Node... inputs) {
         super(inputs);
         _label = label;
@@ -64,6 +66,9 @@ public class PhiNode extends Node {
         if( r.inProgress() ) return _minType;
         // Set type to local top of the starting type
         //Type t = _minType.dual();
+        if(_nid == 1442) {
+            System.out.print("Here");
+        }
         Type t = Type.TOP;
         for (int i = 1; i < nIns(); i++)
             // If the region's control input is live, add this as a dependency
@@ -74,6 +79,13 @@ public class PhiNode extends Node {
                 t = t.meet(in(i)._type);
             }
         t = t.join( _minType );
+
+        // phi loop widening part
+        if (_type != null && t instanceof TypeInteger ti && t.isa_opto(_type)) {
+            return TypeInteger.same_but_slightly_wider(ti, _minType);
+        }
+
+
         return t;
     }
 

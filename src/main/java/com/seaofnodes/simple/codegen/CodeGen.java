@@ -30,7 +30,10 @@ public class CodeGen {
         Export,                 // Export
     }
     public Phase _phase;
-
+    // triggers the monotonicity assertion for setting types for opto.
+    static public boolean opto_check;
+    // the iterate pass straight after the opto phase
+    static public boolean pesi_iterate_af_opto;
     // ---------------------------
     // Compilation source code
     public final String _src;
@@ -51,6 +54,8 @@ public class CodeGen {
         _stop = new StopNode(src);
         _src = src;
         _arg = arg;
+        opto_check = false;
+        pesi_iterate_af_opto = false;
         _iter = new IterPeeps(workListSeed);
         P = new Parser(this,arg);
     }
@@ -136,7 +141,10 @@ public class CodeGen {
     // Reverse from a constant function pointer to the IR function being called
     public FunNode link( TypeFunPtr tfp ) {
         assert tfp.isConstant();
-        return _linker.get(tfp.makeFrom(Type.BOTTOM));
+        TypeFunPtr tfp_generic = tfp.makeFrom(Type.BOTTOM);
+        FunNode fun =_linker.get(tfp_generic);
+        if( fun!=null && fun.isDead() ) { _linker.remove(tfp_generic); fun = null; }
+        return fun;
     }
 
     // Insert linker mapping from constant function signature to the function
@@ -188,40 +196,84 @@ public class CodeGen {
         // Pessimistic peephole optimization on a worklist
         _iter.iterate(this);
 
-        // OPTIMISTIC PASS GOES HERE
+        // Iter workList is empty at this point
+        // OPTIMISTIC PASS
+        _start.walk( x -> {
+            x._type=Type.TOP;
+//            if(x instanceof CallNode call) call.unlink_all();
+            return null;
+        } ); // Reset all to TOP
 
+        _iter.add(_start);
+
+        CodeGen.opto_check = true; // use optimistic assert when setting the types
+        Node n;
+        ArrayList<Node> al = new ArrayList<>();
+        int[] counts = new int[100000];
+        int count = 0;
+        while( (n=_iter._work.pop()) != null ) {
+            if(n.isDead()) continue;
+            Type old = n._type;
+
+            count++;
+            if(n._nid == 1317 && n._type != Type.TOP && count != 910 && count != 1207) {
+                System.out.print("Here");
+            }
+            if(n._nid == 1354 && n._type != Type.TOP && count != 914 && count != 1250) {
+                System.out.print("Here");
+            }
+            if(n._nid == 1317 && n._type != Type.TOP && count != 910 && count != 1207) {
+                System.out.print("Here");
+            }
+            if( n.set_type_if_changed(n.compute() )) {
+                    if(n._nid == 1317) {
+                            System.out.print("Here");
+                    }
+                    if(n._nid == 1439 && n._type != Type.TOP && count > 1) {
+                        count++;
+                        System.out.print("Here");
+                    }
+                    _iter.addAll(n._outputs);
+            }
+
+        }
+
+        CodeGen.opto_check = false; // go back to pessimistic assert
         // Not really a true optimistic pass, but look for unlinked functions.
         // This can be removed, which may trigger another round of pessimistic.
         // This is the point where we flip from a virtual Call Graph (any call
         // can call any function) to having a correct (but conservative) CG.
-        int progress = 0;
-        while( progress != _start.nOuts() ) {
-            progress = _start.nOuts();
-            FunNode main = link(_main);
-            for( int i=0; i<_start.nOuts(); i++ ) {
-                Node use = _start.out(i);
-                if( use instanceof FunNode fun &&
-                    fun.nIns()==2 && fun.in(1)==_start && fun != main &&
-                    (fun._name==null || fun._name.startsWith("sys.")) ) {
-                    add(fun).setDef(1,Parser.XCTRL);
-                    addAll(fun._outputs);
-                    i--;
-                }
-            }
-            _iter.iterate(this);
-        }
+
+        CodeGen.pesi_iterate_af_opto = true;
+        _iter.iterate(this);
+//        int progress = 0;
+//        while( progress != _start.nOuts() ) {
+//            progress = _start.nOuts();
+//            FunNode main = link(_main);
+//            for( int i=0; i<_start.nOuts(); i++ ) {
+//                Node use = _start.out(i);
+//                if( use instanceof FunNode fun &&
+//                    fun.nIns()==2 && fun.in(1)==_start && fun != main &&
+//                    (fun._name==null || fun._name.startsWith("sys.")) ) {
+//                    add(fun).setDef(1,Parser.XCTRL);
+//                    addAll(fun._outputs);
+//                    i--;
+//                }
+//            }
+//            _iter.iterate(this);
+//        }
 
         // Freeze field sizes; do struct layouts; convert field offsets into
         // constants.
-        for( int i=0; i<_start.nOuts(); i++ ) {
-            Node use = _start.out(i);
-            if( use instanceof ConFldOffNode off ) {
-                TypeMemPtr tmp = (TypeMemPtr) Parser.TYPES.get(off._name);
-                off.subsume( off.asOffset(tmp._obj) );
-                i--;
-            }
-        }
-        _iter.iterate(this);
+//        for( int i=0; i<_start.nOuts(); i++ ) {
+//            Node use = _start.out(i);
+//            if( use instanceof ConFldOffNode off ) {
+//                TypeMemPtr tmp = (TypeMemPtr) Parser.TYPES.get(off._name);
+//                off.subsume( off.asOffset(tmp._obj) );
+//                i--;
+//            }
+//        }
+//        _iter.iterate(this);
 
         // To help with testing, sort StopNode returns by NID
         Arrays.sort(_stop._inputs._es,0,_stop.nIns(),(x,y) -> x._nid - y._nid );
@@ -232,6 +284,7 @@ public class CodeGen {
         // Optimistic
         // TODO:
         // loop unroll, peel, RCE, etc
+        CodeGen.pesi_iterate_af_opto = false;
         return this;
     }
     public <N extends Node> N add( N n ) { return _iter.add(n); }
